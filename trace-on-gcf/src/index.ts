@@ -5,8 +5,8 @@ let traceApi: tracer.PluginTypes.Tracer | undefined;
 if (process.env.NODE_ENV === "production") {
   traceApi = tracer.start({
     projectId,
-    logLevel: 4, // debug
-    bufferSize: 10
+    // logLevel: 4, // debug
+    // bufferSize: 10
   });
 }
 
@@ -57,21 +57,27 @@ async function run(
       ? `projects/${projectId}/traces/${traceId}`
       : undefined;
 
+  logger.info("message-function", { trace, messageData: message });
+
   logger.info("start-function", { trace, context });
 
   logger.warn("test-warn", { trace, text: "test" });
 
   const sleep100 = await runWithChildSpan(
-    async () => {
-      return await sleep(100);
+    async span => {
+      const res = await sleep(100);
+      span?.endSpan()
+      return res
     },
     { name: "sleep100" },
     rootSpan
   );
 
   const sleep150 = await runWithChildSpan(
-    async () => {
-      return await sleep(150);
+    async span => {
+      const res = await sleep(150);
+      span?.endSpan()
+      return res
     },
     { name: "sleep150" },
     rootSpan
@@ -81,15 +87,13 @@ async function run(
 }
 
 function runWithChildSpan<T>(
-  callback: () => T,
+  callback: (span?: tracer.PluginTypes.Span) => T,
   spanOptions: tracer.PluginTypes.SpanOptions,
   rootSpan?: tracer.PluginTypes.RootSpan
 ): T {
   if (rootSpan) {
     const childSpan = rootSpan.createChildSpan(spanOptions);
-    const res = callback();
-    childSpan.endSpan();
-    return res;
+    return callback(childSpan);
   } else {
     return callback();
   }
