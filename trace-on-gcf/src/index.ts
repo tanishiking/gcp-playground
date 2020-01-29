@@ -3,10 +3,14 @@ import * as tracer from "@google-cloud/trace-agent";
 const projectId = process.env.GCP_PROJECT;
 let traceApi: tracer.PluginTypes.Tracer | undefined;
 if (process.env.NODE_ENV === "production") {
+  // const credentials = require('./credentials/trace-agent-key.json')
+  // console.log(credentials)
   traceApi = tracer.start({
     projectId,
+    // credentials,
     // logLevel: 4, // debug
     // bufferSize: 10
+    keyFilename: "./credentials/trace-agent-key.json"
   });
 }
 
@@ -17,8 +21,9 @@ import { LoggingWinston } from "@google-cloud/logging-winston";
 import * as winston from "winston";
 import * as Transport from "winston-transport";
 
+const loggingWinston = new LoggingWinston()
+
 function createLogger(): winston.Logger {
-  const loggingWinston = new LoggingWinston();
   const transports: Transport[] = [
     process.env.NODE_ENV === "production"
       ? loggingWinston
@@ -30,7 +35,7 @@ function createLogger(): winston.Logger {
   });
 }
 
-const logger = createLogger();
+const defaultLogger = createLogger();
 
 export async function traceOnGcf(
   message: PubsubMessage,
@@ -57,17 +62,31 @@ async function run(
       ? `projects/${projectId}/traces/${traceId}`
       : undefined;
 
-  logger.info("message-function", { trace, messageData: message });
+  if (context.eventId) {
+    defaultLogger.configure({
+      transports: new LoggingWinston({
+        labels: {
+          execution_id: context.eventId,
+        },
+      })
+    });
+  }
 
-  logger.info("start-function", { trace, context });
+  const logger = defaultLogger.child({
+    trace
+  });
 
-  logger.warn("test-warn", { trace, text: "test" });
+  logger.info("message-function", { messageData: message });
+
+  logger.info("start-function", { context });
+
+  logger.warn("test-warn", { text: "test" });
 
   const sleep100 = await runWithChildSpan(
     async span => {
-      const res = await sleep(100);
-      span?.endSpan()
-      return res
+      const res = await sleep(100, logger);
+      span?.endSpan();
+      return res;
     },
     { name: "sleep100" },
     rootSpan
@@ -75,9 +94,9 @@ async function run(
 
   const sleep150 = await runWithChildSpan(
     async span => {
-      const res = await sleep(150);
-      span?.endSpan()
-      return res
+      const res = await sleep(150, logger);
+      span?.endSpan();
+      return res;
     },
     { name: "sleep150" },
     rootSpan
@@ -104,10 +123,11 @@ function runWithChildSpan<T>(
  * @param duration sleep time (milliseconds)
  * @param trace traceId that is passed to stackdriver logging.
  */
-const sleep = (duration: number, trace?: string): Promise<number> => {
+const sleep = (duration: number, logger?: winston.Logger): Promise<number> => {
+  const log = logger ? logger : defaultLogger;
   return new Promise(resolve => {
     setTimeout(() => {
-      logger.info(`finished-sleep-${duration}`, { trace });
+      log.info(`finished-sleep-${duration}`);
       resolve(duration);
     }, duration);
   });
