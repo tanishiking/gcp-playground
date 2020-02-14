@@ -62,18 +62,13 @@ async function run(
       ? `projects/${projectId}/traces/${traceId}`
       : undefined;
 
-  if (context.eventId) {
-    defaultLogger.configure({
-      transports: new LoggingWinston({
-        labels: {
-          execution_id: context.eventId,
-        },
-      })
-    });
-  }
-
   const logger = defaultLogger.child({
-    trace
+    trace,
+    // If the metadata contains a labels property, promote it to the entry metadata.
+    // https://github.com/googleapis/nodejs-logging-winston/blob/7101871c02e7c7753a10d9ac4739f2ea7fe8f58a/src/common.ts#L178-L185
+    labels: {
+      execution_id: context.eventId,
+    },
   });
 
   logger.info("message-function", { messageData: message });
