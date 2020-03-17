@@ -1,0 +1,24 @@
+{
+  "name": "pubsub-test",
+  "version": "1.0.0",
+  "description": "",
+  "main": "build/index.js",
+  "dependencies": {
+    "@google-cloud/functions-framework": "^1.4.0",
+    "@google-cloud/logging-winston": "^3.0.5",
+    "@google-cloud/pubsub": "^1.5.0",
+    "winston": "^3.2.1",
+    "winston-transport": "^4.3.0"
+  },
+  "devDependencies": {
+    "typescript": "^3.8.2"
+  },
+  "scripts": {
+    "build": "tsc --project .",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "functions-framework --target=pubsubTest --port=9010 --signature-type=event",
+    "deploy": "gcloud functions deploy pubsubTest --runtime nodejs10 --trigger-topic pubsub-test --region asia-northeast1"
+  },
+  "author": "",
+  "license": "ISC"
+}
